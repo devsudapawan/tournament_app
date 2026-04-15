@@ -162,11 +162,11 @@ class _LobbySlotCard extends StatelessWidget {
                         child: TextFormField(
                           initialValue: e.value,
                           style: AppTextStyles.body(
-                              color: AppColors.white, size: 13),
+                              color: AppColors.white, size: 14),
                           decoration: const InputDecoration(
                             isDense: true,
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
+                            contentPadding: EdgeInsets.all(7),
                           ),
                         ),
                       ),
