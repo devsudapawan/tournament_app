@@ -341,6 +341,7 @@ class GeminiService {
   // ML Kit instance — reused across all calls, disposed with service
   final _ocr = MlKitOcrService();
 
+
   static const _systemInstruction = '''
 You are an Esports Data Extraction specialist for BGMI and PUBG Mobile.
 Your ONLY job is to extract data from game screenshots and return valid JSON.
@@ -435,7 +436,10 @@ Skip any slot that is locked, empty, or has no team name.
             confidence: 0.95,
           ));
         }
-      } catch (_) {}
+      } catch (e, stack) {
+        debugPrint('[GeminiService] Error parsing team list JSON: $e\nRaw: $raw\nStack: $stack');
+        throw Exception('AI JSON Parse Error: $e\nRaw Text: $raw');
+      }
     }
 
     onProgress?.call(images.length, images.length, 'Complete');
@@ -508,7 +512,10 @@ List ALL players visible in each slot.
             confidence:  0.95,
           ));
         }
-      } catch (_) {}
+      } catch (e, stack) {
+        debugPrint('[GeminiService] Error parsing lobby JSON: $e\nRaw: $raw\nStack: $stack');
+        throw Exception('AI JSON Parse Error: $e\nRaw Text: $raw');
+      }
     }
 
     onProgress?.call(images.length, images.length, 'Complete');
@@ -589,7 +596,10 @@ List EVERY player you can see. Do not skip any.
         }
 
         runningRankOffset = maxRankInImage + 1;
-      } catch (_) {}
+      } catch (e, stack) {
+        debugPrint('[GeminiService] Error parsing result JSON: $e\nRaw: $raw\nStack: $stack');
+        throw Exception('AI JSON Parse Error: $e\nRaw Text: $raw');
+      }
     }
 
     onProgress?.call(images.length, images.length, 'Complete');
@@ -670,12 +680,35 @@ List EVERY player you can see. Do not skip any.
 
   // Vision only — no OCR attempt
 // Used for complex game UI screenshots (lobby, results)
+//   Future<String?> _callVisionWithFallback(File image, String prompt) async {
+//     debugPrint('[GeminiService] Calling vision model (lite)...');
+//     try {
+//       final resp = await _callVisionModel(image, prompt, AppConstants.geminiFlashLite);
+//       if (resp != null && resp.trim().isNotEmpty) return resp;
+//     } catch (e) {
+//       debugPrint('[GeminiService] lite generated error: $e');
+//     }
+//
+//     debugPrint('[GeminiService] lite failed, calling vision model (flash)...');
+//     final fallback = await _callVisionModel(image, prompt, AppConstants.geminiFlash);
+//     if (fallback != null && fallback.trim().isNotEmpty) return fallback;
+//
+//     debugPrint('[GeminiService] Both vision models failed or returned empty.');
+//     return null;
+//   }
+
+
   Future<String?> _callVisionWithFallback(File image, String prompt) async {
-    final r = await _callVisionModel(image, prompt, AppConstants.geminiFlash);
-    if (r != null && r.trim().isNotEmpty) return r;
+    try {
+      debugPrint('[GeminiService] Calling vision model...');
+      final r = await _callVisionModel(image, prompt, AppConstants.geminiFlash);
+      if (r != null && r.trim().isNotEmpty) return r;
+      debugPrint('[GeminiService] Vision returned empty.');
+    } catch (e) {
+      debugPrint('[GeminiService] Vision failed: $e');
+    }
     return null;
   }
-
   // ── Text-only Gemini call ──────────────────────────────────
   Future<String?> _callTextModel(
       String ocrText,
@@ -696,9 +729,11 @@ List EVERY player you can see. Do not skip any.
       if (e.message.contains('quota') || e.message.contains('rate')) {
         throw GeminiQuotaException(e.message);
       }
-      return null;
-    } catch (_) {
-      return null;
+      debugPrint('[GeminiService] vision model error: ${e.message}');
+      return null;  // ← changed
+    } catch (e) {
+      debugPrint('[GeminiService] vision model unexpected: $e');
+      return null;  // ← changed
     }
   }
 
@@ -723,9 +758,11 @@ List EVERY player you can see. Do not skip any.
       if (e.message.contains('quota') || e.message.contains('rate')) {
         throw GeminiQuotaException(e.message);
       }
-      return null;
-    } catch (_) {
-      return null;
+      debugPrint('[GeminiService] vision model error: ${e.message}');
+      return null;  // ← changed
+    } catch (e) {
+      debugPrint('[GeminiService] vision model unexpected: $e');
+      return null;  // ← changed
     }
   }
 

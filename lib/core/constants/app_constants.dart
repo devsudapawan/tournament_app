@@ -10,6 +10,7 @@
 //   static const geminiFlashLite = 'gemini-flash-lite-latest';
 //   static const geminiFlash     = 'gemini-flash-latest';
 //
+
 //   // ── Tournament Rules ──────────────────────────
 //   static const minMatches       = 3;
 //   static const maxMatches       = 8;
@@ -51,13 +52,21 @@ class AppConstants {
   // ── Supabase ──────────────────────────────────
   static const supabaseUrl      = 'https://fwjjsxbcrowjgxiizung.supabase.co';
   static const supabaseAnonKey  = 'sb_publishable_LHwRi40hYKv8mtgEptRd-Q_iXYlB_HU';
-  static const geminiApiKey     = 'AIzaSyDfGdGUH0wktlvBecJg3PvuFiL8q-Xu7wM';
+  static const geminiApiKey     = 'AIzaSyD1WL_Ua8o99BOlWENtvFaiWDEzHDVu5gk';
 
   // ── Gemini Model Names (corrected) ───────────
   // gemini-2.0-flash-lite → fast, very high text quota, used first
   // gemini-2.0-flash      → fallback when lite fails
-  static const geminiFlashLite = 'gemini-flash-lite-latest';
-  static const geminiFlash     = 'gemini-flash-latest';
+  // static const geminiFlashLite = 'gemini-flash-lite-latest';
+  // static const geminiFlash     = 'gemini-flash-latest';
+
+
+  // Change these two lines:
+  static const geminiFlashLite = 'gemini-2.0-flash-lite';
+  static const geminiFlash     = 'gemini-2.0-flash';
+  //
+  // static const geminiFlashLite = 'gemini-2.0-flash-lite';
+  // static const geminiFlash     = 'gemini-2.0-flash';
 
   // ── Tournament Rules ──────────────────────────
   static const minMatches       = 3;

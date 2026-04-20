@@ -1,13 +1,17 @@
 // lib/presentation/features/match/verify/verify_notifier.dart
 //
 // Manages OCR verification and saving of lobby / result data.
+// Lobby: saves players to DB, updates match status → lobby_uploaded
+// Result: runs MatchResolutionService, saves points, status → completed
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../core/utils/match_resolution_service.dart';
 import '../../../../data/models/ocr_result_model.dart';
 import '../../../../domain/entities/team_entity.dart';
 import '../../../../domain/entities/player_entity.dart';
 import '../../../common/providers/providers.dart';
+import '../upload/upload_screen.dart';
 
 // ── Lobby Verify State ─────────────────────────────────────
 class LobbyVerifyState {
@@ -41,13 +45,11 @@ class LobbyVerifyNotifier extends StateNotifier<LobbyVerifyState> {
   final Ref    _ref;
   final String tournamentId;
   final String matchId;
-  final List<TeamEntity> teams;
 
   LobbyVerifyNotifier(
     this._ref,
     this.tournamentId,
     this.matchId,
-    this.teams,
     List<OcrLobbyEntry> entries,
   ) : super(LobbyVerifyState(entries: entries));
 
@@ -67,40 +69,76 @@ class LobbyVerifyNotifier extends StateNotifier<LobbyVerifyState> {
   Future<void> confirm() async {
     state = state.copyWith(isSaving: true, errorMessage: null);
 
-    // Build player entities from OCR entries
-    // Match each slot entry → find team by slot number → create players
-    final slotToTeam = {for (final t in teams) t.slotNumber: t};
-    final updatedTeams = <TeamEntity>[];
+    try {
+      // Load teams from DB for this tournament
+      final teamsResult = await _ref
+          .read(getTeamsUseCaseProvider)
+          .call(tournamentId);
+      final teams = teamsResult.fold(
+        (f) => <TeamEntity>[],
+        (t) => t,
+      );
 
-    for (final entry in state.entries) {
-      final team = slotToTeam[entry.slotNumber];
-      if (team == null) continue;
+      if (teams.isEmpty) {
+        state = state.copyWith(
+          isSaving: false,
+          errorMessage: 'No teams found for this tournament.',
+        );
+        return;
+      }
 
-      final players = entry.playerNames
-          .map((name) => PlayerEntity(
-                id:           const Uuid().v4(),
-                teamId:       team.id,
-                tournamentId: tournamentId,
-                name:         name.trim(),
-              ))
-          .toList();
+      // Build player entities from OCR entries
+      // Match each slot entry → find team by slot number → create players
+      final slotToTeam = {for (final t in teams) t.slotNumber: t};
+      final updatedTeams = <TeamEntity>[];
 
-      updatedTeams.add(team.copyWith(players: players));
+      for (final entry in state.entries) {
+        final team = slotToTeam[entry.slotNumber];
+        if (team == null) continue;
+
+        final players = entry.playerNames
+            .where((name) => name.trim().isNotEmpty)
+            .map((name) => PlayerEntity(
+                  id:           const Uuid().v4(),
+                  teamId:       team.id,
+                  tournamentId: tournamentId,
+                  name:         name.trim(),
+                ))
+            .toList();
+
+        updatedTeams.add(team.copyWith(players: players));
+      }
+
+      // Save players to DB
+      final result = await _ref
+          .read(tournamentRepositoryProvider)
+          .savePlayers(updatedTeams);
+
+      // Check for save error
+      final hasError = result.fold((_) => true, (_) => false);
+      if (hasError) {
+        result.fold(
+          (f) => state = state.copyWith(
+            isSaving: false,
+            errorMessage: f.message,
+          ),
+          (_) {},
+        );
+        return;
+      }
+
+      // Update match status → lobby_uploaded
+      await _ref
+          .read(matchRepositoryProvider)
+          .updateMatchStatus(matchId, 'lobby_uploaded');
+
+      state = state.copyWith(isSaving: false, isSaved: true);
+    } catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: 'Failed to save lobby: ${e.toString()}',
+      );
     }
-
-    final result = await _ref
-        .read(tournamentRepositoryProvider)
-        .savePlayers(updatedTeams);
-
-    // Update match status → lobby_uploaded
-    await _ref
-        .read(matchRepositoryProvider)
-        .updateMatchStatus(matchId, 'lobby_uploaded');
-
-    result.fold(
-      (f) => state = state.copyWith(isSaving: false, errorMessage: f.message),
-      (_) => state = state.copyWith(isSaving: false, isSaved: true),
-    );
   }
 }
 
@@ -136,28 +174,13 @@ class ResultVerifyNotifier extends StateNotifier<ResultVerifyState> {
   final Ref    _ref;
   final String tournamentId;
   final String matchId;
-  final List<TeamEntity> teams;
 
   ResultVerifyNotifier(
     this._ref,
     this.tournamentId,
     this.matchId,
-    this.teams,
     List<OcrResultEntry> entries,
   ) : super(ResultVerifyState(entries: entries));
-
-  void assignTeam(int entryIndex, String teamId, String teamName) {
-    final updated = [...state.entries];
-    updated[entryIndex] = OcrResultEntry(
-      rankPosition:       updated[entryIndex].rankPosition,
-      players:            updated[entryIndex].players,
-      matchedTeamId:      teamId,
-      matchedTeamName:    teamName,
-      matchConfidence:    1.0,
-      isManuallyAssigned: true,
-    );
-    state = state.copyWith(entries: updated);
-  }
 
   void updatePlayerKills(int entryIndex, int playerIndex, int kills) {
     final updated = [...state.entries];
@@ -167,76 +190,154 @@ class ResultVerifyNotifier extends StateNotifier<ResultVerifyState> {
       kills:      kills,
     );
     updated[entryIndex] = OcrResultEntry(
-      rankPosition:    updated[entryIndex].rankPosition,
-      players:         players,
-      matchedTeamId:   updated[entryIndex].matchedTeamId,
-      matchedTeamName: updated[entryIndex].matchedTeamName,
-      matchConfidence: updated[entryIndex].matchConfidence,
+      rankPosition: updated[entryIndex].rankPosition,
+      players:      players,
     );
     state = state.copyWith(entries: updated);
   }
 
+  /// Runs the full matching pipeline (Steps 4.1–4.5) then saves.
   Future<void> confirm() async {
-    // Check all entries have matched teams
-    final unmatched = state.entries.where((e) => !e.isMatched).toList();
-    if (unmatched.isNotEmpty) {
-      state = state.copyWith(
-        errorMessage:
-            '${unmatched.length} team(s) not matched. Please assign manually.',
-      );
-      return;
-    }
-
     state = state.copyWith(isSaving: true, errorMessage: null);
 
-    final slotToTeam  = {for (final t in teams) t.id: t};
-    final saveResults = _ref.read(saveMatchResultUseCaseProvider);
-    final saveKills   = _ref.read(savePlayerKillsUseCaseProvider);
-
-    for (final entry in state.entries) {
-      if (!entry.isMatched) continue;
-
-      final team = slotToTeam[entry.matchedTeamId];
-      if (team == null) continue;
-
-      // Save rank result
-      await saveResults.call(
-        matchId:      matchId,
-        tournamentId: tournamentId,
-        teamId:       entry.matchedTeamId!,
-        slotNumber:   team.slotNumber,
-        rankPosition: entry.rankPosition,
-        kills:        entry.totalKills,
+    try {
+      // ── Stage 1+2: Load teams (with players from lobby) ──────
+      final teamsResult = await _ref
+          .read(getTeamsUseCaseProvider)
+          .call(tournamentId);
+      final teams = teamsResult.fold(
+        (f) => <TeamEntity>[],
+        (t) => t,
       );
 
-      // Save individual player kills for MVP
-      for (final player in entry.players) {
-        final playerEntity = team.players.firstWhere(
-          (p) => p.name.toLowerCase() == player.playerName.toLowerCase(),
-          orElse: () => PlayerEntity(
-            id:           const Uuid().v4(),
-            teamId:       team.id,
-            tournamentId: tournamentId,
-            name:         player.playerName,
-          ),
+      if (teams.isEmpty) {
+        state = state.copyWith(
+          isSaving: false,
+          errorMessage: 'No teams found. Was the lobby uploaded for this match?',
         );
+        return;
+      }
 
-        await saveKills.call(
+      // Verify teams have players loaded (from lobby save)
+      final hasPlayers = teams.any((t) => t.players.isNotEmpty);
+      if (!hasPlayers) {
+        state = state.copyWith(
+          isSaving: false,
+          errorMessage: 'No player data found. Please upload lobby first.',
+        );
+        return;
+      }
+
+      // ── Stage 3: Match result players → lobby players → teams ──
+      // Uses MatchResolutionService for fuzzy matching (threshold: 0.75)
+      final resolved = MatchResolutionService.resolveMatchResults(
+        resultEntries: state.entries,
+        teams:         teams,
+      );
+
+      // Check for unmatched teams
+      final unmatched = resolved.where((r) => r.teamId.isEmpty).toList();
+      if (unmatched.isNotEmpty) {
+        state = state.copyWith(
+          isSaving: false,
+          errorMessage:
+              '${unmatched.length} team(s) could not be matched to lobby data. '
+              'Please check lobby player names.',
+        );
+        return;
+      }
+
+      // ── Stage 4+5: Save results to DB ──────────────────────
+      final saveResults = _ref.read(saveMatchResultUseCaseProvider);
+      final saveKills   = _ref.read(savePlayerKillsUseCaseProvider);
+
+      for (final result in resolved) {
+        // Save match result per team
+        // The Supabase RPC 'calculate_and_insert_match_result' handles
+        // rank_points, kill_points, total_points calculation server-side
+        await saveResults.call(
           matchId:      matchId,
           tournamentId: tournamentId,
-          teamId:       team.id,
-          playerId:     playerEntity.id,
-          playerName:   player.playerName,
-          kills:        player.kills,
+          teamId:       result.teamId,
+          slotNumber:   result.slotNumber,
+          rankPosition: result.rankPosition,
+          kills:        result.totalKills,
         );
+
+        // Save individual player kills for MVP tracking
+        final team = teams.firstWhere(
+          (t) => t.id == result.teamId,
+          orElse: () => teams.first,
+        );
+
+        for (final player in result.playerKills) {
+          // Try to find existing player entity from lobby data
+          PlayerEntity playerEntity;
+          try {
+            playerEntity = team.players.firstWhere(
+              (p) => p.name.toLowerCase() == player.playerName.toLowerCase(),
+            );
+          } catch (_) {
+            // Player not found in lobby — create a temporary ID
+            playerEntity = PlayerEntity(
+              id:           const Uuid().v4(),
+              teamId:       team.id,
+              tournamentId: tournamentId,
+              name:         player.playerName,
+            );
+          }
+
+          await saveKills.call(
+            matchId:      matchId,
+            tournamentId: tournamentId,
+            teamId:       team.id,
+            playerId:     playerEntity.id,
+            playerName:   player.playerName,
+            kills:        player.kills,
+          );
+        }
       }
+
+      // Update match status → completed
+      await _ref
+          .read(matchRepositoryProvider)
+          .updateMatchStatus(matchId, 'completed');
+
+      state = state.copyWith(isSaving: false, isSaved: true);
+    } catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: 'Failed to save results: ${e.toString()}',
+      );
     }
-
-    // Update match status
-    await _ref
-        .read(matchRepositoryProvider)
-        .updateMatchStatus(matchId, 'completed');
-
-    state = state.copyWith(isSaving: false, isSaved: true);
   }
 }
+
+// ── Providers ──────────────────────────────────────────────
+// Key format: "tournamentId__matchId"
+
+final lobbyVerifyNotifierProvider = StateNotifierProvider.autoDispose
+    .family<LobbyVerifyNotifier, LobbyVerifyState, String>(
+  (ref, key) {
+    final parts        = key.split('__');
+    final tournamentId = parts[0];
+    final matchId      = parts[1];
+    // Read AI-extracted lobby entries from upload screen provider
+    final providerKey  = '${matchId}__lobby';
+    final entries      = ref.read(lobbyAiResultProvider(providerKey));
+    return LobbyVerifyNotifier(ref, tournamentId, matchId, entries);
+  },
+);
+
+final resultVerifyNotifierProvider = StateNotifierProvider.autoDispose
+    .family<ResultVerifyNotifier, ResultVerifyState, String>(
+  (ref, key) {
+    final parts        = key.split('__');
+    final tournamentId = parts[0];
+    final matchId      = parts[1];
+    // Read AI-extracted result entries from upload screen provider
+    final providerKey  = '${matchId}__result';
+    final entries      = ref.read(resultAiResultProvider(providerKey));
+    return ResultVerifyNotifier(ref, tournamentId, matchId, entries);
+  },
+);
