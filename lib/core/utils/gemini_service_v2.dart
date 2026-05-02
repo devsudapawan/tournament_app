@@ -401,24 +401,26 @@ Rules:
       );
 
       const prompt = '''
-This text is extracted from a BGMI/PUBG tournament slot list image.
-Each entry shows a slot number and a team name.
+This image shows a BGMI/PUBG tournament slot list.
+It may be a promotional card, a screenshot, or any other format.
+Each row or entry shows a slot number and a team name.
 
-Extract every slot number and team name visible.
-Slot numbers may appear as: 03, 3, #3, #03, | 3
-Ignore team logos — extract text only.
+Extract every slot number and team name you can see.
+Ignore team logos, images, or icons — only extract the text.
+Slot numbers may look like: 03, 3, #3, #03, | 3
 
 Return a JSON array ONLY:
 [
   {"slot": 3, "team_name": "5 BROTHERS ESPORTS"},
-  {"slot": 4, "team_name": "INX ESPORTS"}
+  {"slot": 4, "team_name": "INX ESPORTS"},
+  {"slot": 13, "team_name": "KARUNADU ESPORTS"}
 ]
 
 Skip any slot that is locked, empty, or has no team name.
 ''';
 
-      // final raw = await _processImage(images[i], prompt);
       final raw = await _callVisionWithFallback(images[i], prompt);
+      debugPrint('[DEBUG] raw response: $raw');
       if (raw == null) continue;
 
       try {
@@ -438,7 +440,8 @@ Skip any slot that is locked, empty, or has no team name.
         }
       } catch (e, stack) {
         debugPrint('[GeminiService] Error parsing team list JSON: $e\nRaw: $raw\nStack: $stack');
-        throw Exception('AI JSON Parse Error: $e\nRaw Text: $raw');
+        // Don't rethrow — continue to next image if one fails to parse
+        continue;
       }
     }
 
@@ -699,14 +702,28 @@ List EVERY player you can see. Do not skip any.
 
 
   Future<String?> _callVisionWithFallback(File image, String prompt) async {
-    try {
-      debugPrint('[GeminiService] Calling vision model...');
-      final r = await _callVisionModel(image, prompt, AppConstants.geminiFlash);
-      if (r != null && r.trim().isNotEmpty) return r;
-      debugPrint('[GeminiService] Vision returned empty.');
-    } catch (e) {
-      debugPrint('[GeminiService] Vision failed: $e');
+    // Try flash-lite first (higher quota), then flash as fallback
+    for (final model in [AppConstants.geminiFlashLite, AppConstants.geminiFlash]) {
+      for (int attempt = 0; attempt < 2; attempt++) {
+        try {
+          debugPrint('[GeminiService] Calling vision model $model (attempt ${attempt + 1})...');
+          final r = await _callVisionModel(image, prompt, model);
+          debugPrint('[DEBUG] vision returned: $r');
+          if (r != null && r.trim().isNotEmpty) return r;
+          debugPrint('[GeminiService] Vision returned empty for $model.');
+          break; // Empty response → try next model, no retry
+        } on GeminiQuotaException {
+          rethrow; // Quota errors should bubble up
+        } catch (e) {
+          debugPrint('[GeminiService] Vision failed for $model (attempt ${attempt + 1}): $e');
+          if (attempt == 0) {
+            // Wait before retry on transient errors
+            await Future.delayed(const Duration(seconds: 2));
+          }
+        }
+      }
     }
+    debugPrint('[GeminiService] All vision models failed.');
     return null;
   }
   // ── Text-only Gemini call ──────────────────────────────────
@@ -759,10 +776,10 @@ List EVERY player you can see. Do not skip any.
         throw GeminiQuotaException(e.message);
       }
       debugPrint('[GeminiService] vision model error: ${e.message}');
-      return null;  // ← changed
+      return null;
     } catch (e) {
       debugPrint('[GeminiService] vision model unexpected: $e');
-      return null;  // ← changed
+      return null;
     }
   }
 

@@ -128,6 +128,46 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(ServerFailure(e.message));
     }
   }
+  // Inside TournamentRepositoryImpl — add this method:
+  @override
+  Future<Either<Failure, void>> deleteTournament(String id) async {
+    try {
+      await remote.deleteTournament(id);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+// Inside MatchRepositoryImpl — add these two methods:
+  @override
+  Future<Either<Failure, void>> addMatch({
+    required String tournamentId,
+    required int matchNumber,
+  }) async {
+    try {
+      await remote.insertMatches([{
+        'tournament_id': tournamentId,
+        'match_number':  matchNumber,
+        'status':        'pending',
+        'scheduled_at':  null,
+      }]);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteMatch(String matchId) async {
+    try {
+      await remote.deleteMatch(matchId);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
 }
 
 // ── Tournament Repository ──────────────────────────────────
@@ -222,6 +262,16 @@ class TournamentRepositoryImpl implements TournamentRepository {
       return Left(ServerFailure(e.message));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> deleteTournament(String id) async {
+    try {
+      await remote.deleteTournament(id);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
 }
 
 // ── Match Repository ───────────────────────────────────────
@@ -246,6 +296,34 @@ class MatchRepositoryImpl implements MatchRepository {
         },
       );
       await remote.insertMatches(maps);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> addMatch({
+    required String tournamentId,
+    required int matchNumber,
+  }) async {
+    try {
+      final map = {
+        'tournament_id': tournamentId,
+        'match_number':  matchNumber,
+        'status':        'pending',
+      };
+      await remote.insertMatches([map]);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteMatch(String matchId) async {
+    try {
+      await remote.deleteMatch(matchId);
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

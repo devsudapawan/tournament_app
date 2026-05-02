@@ -1,6 +1,7 @@
 
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/gemini_service_v2.dart';
 import '../../../../core/utils/snackbar_helper.dart';
 import '../../../common/providers/providers.dart';
 import '../../../common/widgets/app_button.dart';
@@ -76,7 +78,8 @@ class _CreateTournamentScreenState
     if (step > 1) {
       ref.read(_stepProvider.notifier).state = step - 1;
     } else {
-      context.pop();
+      // context.pop();
+      context.go(AppRoutes.home);
     }
   }
 
@@ -667,7 +670,8 @@ class _Step4State extends ConsumerState<_Step4> {
       if (entries.isEmpty && mounted) {
         SnackBarHelper.showError(
           context,
-          'Could not read any teams. Make sure the image is clear and shows slot numbers.',
+          'Could not read any teams. Try re-uploading a clearer image, '
+          'or make sure the image clearly shows slot numbers and team names.',
         );
       } else if (mounted) {
         SnackBarHelper.showSuccess(
@@ -677,10 +681,21 @@ class _Step4State extends ConsumerState<_Step4> {
       }
 
       ref.read(_ocrTeamsProvider.notifier).state = entries;
+    } on GeminiQuotaException catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'AI quota exceeded. Please wait a minute and try again.',
+        );
+        debugPrint('Quota error: ${e.message}');
+      }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, 'OCR error: ${e.toString()}');
-        print("OCR error : ${e.toString()}");
+        SnackBarHelper.showError(
+          context,
+          'Failed to process image. Please try again.',
+        );
+        debugPrint('OCR error: $e');
       }
     } finally {
       ref.read(_ocrRunningProvider.notifier).state = false;
@@ -826,7 +841,7 @@ class _Step4State extends ConsumerState<_Step4> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: AppButton(
-                  label:   'Retry OCR',
+                  label:   'Retry',
                   variant: ButtonVariant.secondary,
                   onTap:   () => _runOcr(images),
                 ),

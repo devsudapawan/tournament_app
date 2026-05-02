@@ -221,6 +221,14 @@ class SupabaseDataSource {
     }
   }
 
+  Future<void> deleteTournament(String id) async {
+    try {
+      await _client.from('tournaments').delete().eq('id', id);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
   // ── Teams ──────────────────────────────────────────────────
 
   Future<List<TeamModel>> insertTeams(List<Map<String, dynamic>> teams) async {
@@ -284,6 +292,14 @@ class SupabaseDataSource {
           .from('matches')
           .update({'status': status})
           .eq('id', matchId);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  Future<void> deleteMatch(String matchId) async {
+    try {
+      await _client.from('matches').delete().eq('id', matchId);
     } catch (e) {
       throw ServerException(e.toString());
     }

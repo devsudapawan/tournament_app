@@ -1,130 +1,3 @@
-// // lib/presentation/features/match/upload/upload_notifier.dart
-// //
-// // Manages image picking and OCR processing for lobby/result uploads.
-//
-// import 'dart:io';
-// import 'package:flutter_riverpod/flutter_riverpod.dart';
-// import '../../../../data/models/ocr_result_model.dart';
-// import '../../../common/providers/providers.dart';
-//
-// enum UploadType { lobby, result }
-//
-// class UploadState {
-//   final List<File> images;
-//   final bool isProcessing;
-//   final String? errorMessage;
-//   final bool isOcrDone;
-//
-//   // OCR output — one of these is populated after processing
-//   final List<OcrLobbyEntry>  lobbyEntries;
-//   final List<OcrResultEntry> resultEntries;
-//
-//   const UploadState({
-//     this.images        = const [],
-//     this.isProcessing  = false,
-//     this.errorMessage,
-//     this.isOcrDone     = false,
-//     this.lobbyEntries  = const [],
-//     this.resultEntries = const [],
-//   });
-//
-//   UploadState copyWith({
-//     List<File>?             images,
-//     bool?                   isProcessing,
-//     String?                 errorMessage,
-//     bool?                   isOcrDone,
-//     List<OcrLobbyEntry>?    lobbyEntries,
-//     List<OcrResultEntry>?   resultEntries,
-//   }) =>
-//       UploadState(
-//         images:         images         ?? this.images,
-//         isProcessing:   isProcessing   ?? this.isProcessing,
-//         errorMessage:   errorMessage,
-//         isOcrDone:      isOcrDone      ?? this.isOcrDone,
-//         lobbyEntries:   lobbyEntries   ?? this.lobbyEntries,
-//         resultEntries:  resultEntries  ?? this.resultEntries,
-//       );
-//
-//   bool get hasImages => images.isNotEmpty;
-// }
-//
-// class UploadNotifier extends StateNotifier<UploadState> {
-//   final Ref _ref;
-//   final String matchId;
-//   final UploadType uploadType;
-//
-//   UploadNotifier(this._ref, this.matchId, this.uploadType)
-//       : super(const UploadState());
-//
-//   int get _maxImages => uploadType == UploadType.lobby ? 3 : 8;
-//   int get _minImages => uploadType == UploadType.lobby ? 1 : 6;
-//
-//   bool get canProcess => state.images.length >= _minImages;
-//   bool get canAddMore => state.images.length < _maxImages;
-//
-//   void addImage(File file) {
-//     if (!canAddMore) return;
-//     state = state.copyWith(
-//       images:    [...state.images, file],
-//       isOcrDone: false,
-//     );
-//   }
-//
-//   void removeImage(int index) {
-//     final updated = [...state.images]..removeAt(index);
-//     state = state.copyWith(images: updated, isOcrDone: false);
-//   }
-//
-//   Future<void> processOcr() async {
-//     if (!canProcess) return;
-//     state = state.copyWith(isProcessing: true, errorMessage: null);
-//
-//     try {
-//       final ocr = _ref.read(ocrServiceProvider);
-//
-//       if (uploadType == UploadType.lobby) {
-//         final entries = await ocr.readLobbyImages(state.images);
-//         state = state.copyWith(
-//           isProcessing: false,
-//           isOcrDone:    true,
-//           lobbyEntries: entries,
-//         );
-//       } else {
-//         final entries = await ocr.readResultImages(state.images);
-//         state = state.copyWith(
-//           isProcessing:  false,
-//           isOcrDone:     true,
-//           resultEntries: entries,
-//         );
-//       }
-//     } catch (e) {
-//       state = state.copyWith(
-//         isProcessing:  false,
-//         errorMessage: 'OCR failed: ${e.toString()}',
-//       );
-//     }
-//   }
-//
-//   void reset() => state = const UploadState();
-// }
-//
-// // Family provider — one notifier per matchId+type pair
-// final uploadNotifierProvider = StateNotifierProvider.autoDispose
-//     .family<UploadNotifier, UploadState, String>(
-//   (ref, key) {
-//     // key format: "matchId__lobby" or "matchId__result"
-//     final parts  = key.split('__');
-//     final matchId = parts[0];
-//     final type    = parts[1] == 'lobby'
-//         ? UploadType.lobby
-//         : UploadType.result;
-//     return UploadNotifier(ref, matchId, type);
-//   },
-// );
-
-
-// lib/presentation/features/match/upload/upload_notifier.dart
-
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/utils/gemini_service_v2.dart';
@@ -134,70 +7,66 @@ import '../../../common/providers/providers.dart';
 enum UploadType { lobby, result }
 
 class UploadState {
-  final List<File>           images;
-  final bool                 isProcessing;
-  final String?              errorMessage;
-  final bool                 isOcrDone;
-  final int                  currentImage;   // progress tracking
-  final int                  totalImages;    // progress tracking
-  final String               statusText;     // progress label
-  final List<OcrLobbyEntry>  lobbyEntries;
+  final List<File> images;
+  final bool isProcessing;
+  final String? errorMessage;
+  final bool isOcrDone;
+  final int currentImage; // progress tracking
+  final int totalImages; // progress tracking
+  final String statusText; // progress label
+  final List<OcrLobbyEntry> lobbyEntries;
   final List<OcrResultEntry> resultEntries;
 
   const UploadState({
-    this.images        = const [],
-    this.isProcessing  = false,
+    this.images = const [],
+    this.isProcessing = false,
     this.errorMessage,
-    this.isOcrDone     = false,
-    this.currentImage  = 0,
-    this.totalImages   = 0,
-    this.statusText    = '',
-    this.lobbyEntries  = const [],
+    this.isOcrDone = false,
+    this.currentImage = 0,
+    this.totalImages = 0,
+    this.statusText = '',
+    this.lobbyEntries = const [],
     this.resultEntries = const [],
   });
 
   UploadState copyWith({
-    List<File>?             images,
-    bool?                   isProcessing,
-    String?                 errorMessage,
-    bool?                   isOcrDone,
-    int?                    currentImage,
-    int?                    totalImages,
-    String?                 statusText,
-    List<OcrLobbyEntry>?    lobbyEntries,
-    List<OcrResultEntry>?   resultEntries,
+    List<File>? images,
+    bool? isProcessing,
+    String? errorMessage,
+    bool? isOcrDone,
+    int? currentImage,
+    int? totalImages,
+    String? statusText,
+    List<OcrLobbyEntry>? lobbyEntries,
+    List<OcrResultEntry>? resultEntries,
   }) =>
       UploadState(
-        images:         images         ?? this.images,
-        isProcessing:   isProcessing   ?? this.isProcessing,
-        errorMessage:   errorMessage,
-        isOcrDone:      isOcrDone      ?? this.isOcrDone,
-        currentImage:   currentImage   ?? this.currentImage,
-        totalImages:    totalImages    ?? this.totalImages,
-        statusText:     statusText     ?? this.statusText,
-        lobbyEntries:   lobbyEntries   ?? this.lobbyEntries,
-        resultEntries:  resultEntries  ?? this.resultEntries,
+        images: images ?? this.images,
+        isProcessing: isProcessing ?? this.isProcessing,
+        errorMessage: errorMessage,
+        isOcrDone: isOcrDone ?? this.isOcrDone,
+        currentImage: currentImage ?? this.currentImage,
+        totalImages: totalImages ?? this.totalImages,
+        statusText: statusText ?? this.statusText,
+        lobbyEntries: lobbyEntries ?? this.lobbyEntries,
+        resultEntries: resultEntries ?? this.resultEntries,
       );
 
-  bool get hasImages  => images.isNotEmpty;
+  bool get hasImages => images.isNotEmpty;
   double get progress => totalImages > 0 ? currentImage / totalImages : 0;
 }
 
 class UploadNotifier extends StateNotifier<UploadState> {
-  final Ref        _ref;
-  final String     matchId;
-  final String     tournamentId;
+  final Ref _ref;
+  final String matchId;
+  final String tournamentId;
   final UploadType uploadType;
 
   UploadNotifier(this._ref, this.matchId, this.tournamentId, this.uploadType)
       : super(const UploadState());
 
-  int get maxImages => uploadType == UploadType.lobby
-      ? 3
-      : 8;
-  int get minImages => uploadType == UploadType.lobby
-      ? 1
-      : 6;
+  int get maxImages => uploadType == UploadType.lobby ? 3 : 8;
+  int get minImages => uploadType == UploadType.lobby ? 1 : 6;
 
   bool get canProcess => state.images.length >= minImages;
   bool get canAddMore => state.images.length < maxImages;
@@ -205,9 +74,9 @@ class UploadNotifier extends StateNotifier<UploadState> {
   void addImages(List<File> files) {
     if (!canAddMore) return;
     final remaining = maxImages - state.images.length;
-    final toAdd     = files.take(remaining).toList();
+    final toAdd = files.take(remaining).toList();
     state = state.copyWith(
-      images:    [...state.images, ...toAdd],
+      images: [...state.images, ...toAdd],
       isOcrDone: false,
     );
   }
@@ -226,8 +95,8 @@ class UploadNotifier extends StateNotifier<UploadState> {
       isProcessing: true,
       errorMessage: null,
       currentImage: 0,
-      totalImages:  state.images.length,
-      statusText:   'Starting Gemini AI...',
+      totalImages: state.images.length,
+      statusText: 'Starting Gemini AI...',
     );
 
     try {
@@ -236,8 +105,8 @@ class UploadNotifier extends StateNotifier<UploadState> {
       void onProgress(int current, int total, String status) {
         state = state.copyWith(
           currentImage: current,
-          totalImages:  total,
-          statusText:   status,
+          totalImages: total,
+          statusText: status,
         );
       }
 
@@ -248,9 +117,9 @@ class UploadNotifier extends StateNotifier<UploadState> {
         );
         state = state.copyWith(
           isProcessing: false,
-          isOcrDone:    true,
+          isOcrDone: true,
           lobbyEntries: entries,
-          statusText:   'Complete',
+          statusText: 'Complete',
         );
       } else {
         final entries = await gemini.extractResults(
@@ -258,10 +127,10 @@ class UploadNotifier extends StateNotifier<UploadState> {
           onProgress: onProgress,
         );
         state = state.copyWith(
-          isProcessing:  false,
-          isOcrDone:     true,
+          isProcessing: false,
+          isOcrDone: true,
           resultEntries: entries,
-          statusText:    'Complete',
+          statusText: 'Complete',
         );
       }
     } on GeminiQuotaException {
@@ -283,13 +152,11 @@ class UploadNotifier extends StateNotifier<UploadState> {
 // Key format: "tournamentId__matchId__lobby" or "tournamentId__matchId__result"
 final uploadNotifierProvider = StateNotifierProvider.autoDispose
     .family<UploadNotifier, UploadState, String>(
-      (ref, key) {
-    final parts        = key.split('__');
+  (ref, key) {
+    final parts = key.split('__');
     final tournamentId = parts[0];
-    final matchId      = parts[1];
-    final type         = parts[2] == 'lobby'
-        ? UploadType.lobby
-        : UploadType.result;
+    final matchId = parts[1];
+    final type = parts[2] == 'lobby' ? UploadType.lobby : UploadType.result;
     return UploadNotifier(ref, matchId, tournamentId, type);
   },
 );

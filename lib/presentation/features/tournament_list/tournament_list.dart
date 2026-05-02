@@ -14,7 +14,7 @@ import '../../common/widgets/app_shimmer.dart';
 import '../../common/widgets/match_status_chip.dart';
 import '../../common/widgets/shared_widgets.dart';
 
-final _allTournamentsProvider =
+final allTournamentsProvider =
     FutureProvider<List<TournamentEntity>>((ref) async {
   final r = await ref.read(getMyTournamentsUseCaseProvider).call();
   return r.fold((_) => [], (list) => list);
@@ -46,7 +46,7 @@ class _TournamentListScreenState extends ConsumerState<TournamentListScreen>
 
   @override
   Widget build(BuildContext context) {
-    final all = ref.watch(_allTournamentsProvider);
+    final all = ref.watch(allTournamentsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bg,

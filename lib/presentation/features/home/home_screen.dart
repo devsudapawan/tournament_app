@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:tournament_app/core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -10,32 +11,44 @@ import '../../../../domain/entities/tournament_entity.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../common/providers/providers.dart';
 import '../../common/widgets/app_shimmer.dart';
+import '../../common/widgets/home_drawer.dart';
 
 // ── News provider — free GNews API ────────────────────────
 // Free tier: 100 requests/day, no key needed for basic use
 final _newsProvider = FutureProvider<List<_NewsItem>>((ref) async {
   try {
     // Using GNews free API for gaming news
+    // final url = Uri.parse(
+    //   'https://gnews.io/api/v4/search'
+    //   '?q=BGMI+PUBG+esports'
+    //   '&lang=en'
+    //   '&max=5'
+    //   '&apikey=YOUR_GNEWS_API_KEY',
+    //   // Get free key at: https://gnews.io — 100 req/day free
+    // );
     final url = Uri.parse(
       'https://gnews.io/api/v4/search'
-      '?q=BGMI+PUBG+esports'
+      '?q=BGMI OR PUBG OR "Free Fire" OR esports OR "battle royale games" OR gaming'
       '&lang=en'
-      '&max=5'
-      '&apikey=YOUR_GNEWS_API_KEY',
-      // Get free key at: https://gnews.io — 100 req/day free
+      '&max=8'
+      '&apikey=${AppConstants.newsApiKey}',
     );
     final resp = await http.get(url).timeout(const Duration(seconds: 5));
     if (resp.statusCode != 200) return _fallbackNews;
     final data = jsonDecode(resp.body) as Map;
     final articles = data['articles'] as List? ?? [];
     return articles
-        .map((a) => _NewsItem(
-              title: a['title'] ?? '',
-              source: a['source']?['name'] ?? '',
-              url: a['url'] ?? '',
-              imageUrl: a['image'],
-              publishedAt: a['publishedAt'] ?? '',
-            ))
+        .map(
+          (a) => _NewsItem(
+            title: a['title'] ?? '',
+            source: a['source']['name'] ?? '',
+            url: a['url'] ?? '',
+            imageUrl: a['image'],
+            publishedAt: a['publishedAt'] ?? '',
+            description: a['description'],
+            content: a['content'],
+          ),
+        )
         .toList();
   } catch (_) {
     return _fallbackNews;
@@ -64,7 +77,7 @@ const _fallbackNews = [
   ),
 ];
 
-final _activeTournamentsProvider =
+final activeTournamentsProvider =
     FutureProvider<List<TournamentEntity>>((ref) async {
   final r = await ref.read(getMyTournamentsUseCaseProvider).call();
   return r.fold(
@@ -76,11 +89,12 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tournaments = ref.watch(_activeTournamentsProvider);
+    final tournaments = ref.watch(activeTournamentsProvider);
     final news = ref.watch(_newsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
+      drawer: const HomeDrawer(),
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -90,6 +104,25 @@ class HomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Row(
                   children: [
+                    Builder(
+                      builder: (context) => GestureDetector(
+                        onTap: () => Scaffold.of(context).openDrawer(),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.bg3,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.menu,
+                              color: AppColors.white, size: 18),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
                     Container(
                       width: 36,
                       height: 36,
@@ -116,7 +149,7 @@ class HomeScreen extends ConsumerWidget {
                     const Spacer(),
                     // Quick create button
                     GestureDetector(
-                      onTap: () => context.go(AppRoutes.createTournament),
+                      onTap: () => context.push(AppRoutes.createTournament),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 8),
@@ -244,9 +277,15 @@ class HomeScreen extends ConsumerWidget {
               ),
               data: (items) => SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (_, i) => Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                    child: _NewsCard(item: items[i]),
+                  (_, i) => GestureDetector(
+                    onTap: () => context.push(
+                      AppRoutes.newsDetailPage,
+                      extra: items[i],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                      child: _NewsCard(item: items[i]),
+                    ),
                   ),
                   childCount: items.length,
                 ),
@@ -374,6 +413,7 @@ class _NewsCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(item.source,
+                          overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.label(
                               color: AppColors.yellow, size: 10)),
                       if (item.publishedAt.isNotEmpty) ...[
@@ -411,6 +451,8 @@ class _NewsItem {
   final String url;
   final String? imageUrl;
   final String publishedAt;
+  final String? description;
+  final String? content;
 
   const _NewsItem({
     required this.title,
@@ -418,5 +460,7 @@ class _NewsItem {
     required this.url,
     this.imageUrl,
     required this.publishedAt,
+    this.description,
+    this.content,
   });
 }

@@ -6,6 +6,7 @@ import 'package:tournament_app/presentation/features/auth/profile/profile_screen
 import 'package:tournament_app/presentation/features/home/home_screen.dart';
 import '../../presentation/common/providers/auth_state_provider.dart';
 import '../../presentation/features/dashboard/dashboard_screen.dart';
+import '../../presentation/features/news/news_screen.dart';
 import '../../presentation/features/shell/main_shell.dart';
 import '../../presentation/features/splash/splash_screen.dart';
 import '../../presentation/features/auth/login/login_screen.dart';
@@ -104,6 +105,13 @@ GoRouter appRouter(AppRouterRef ref) {
         ),
       ),
 
+      GoRoute(
+        path: AppRoutes.newsDetailPage,
+        builder: (_, state) => NewsDetailPage(
+          news: state.extra,
+        ),
+      ),
+
       // ── Main app shell with bottom nav ───────────
       ShellRoute(
         builder: (_, __, child) => MainShell(child: child),
@@ -152,4 +160,5 @@ class AppRoutes {
   static const verify = '/verify';
   static const home = '/home';
   static const leaderboard = '/leaderboard';
+  static const newsDetailPage = '/newsDetailPage';
 }

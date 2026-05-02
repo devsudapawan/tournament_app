@@ -33,6 +33,7 @@ abstract class TournamentRepository {
   Future<Either<Failure, List<TeamEntity>>>       saveTeams(List<TeamEntity> teams);
   Future<Either<Failure, List<TeamEntity>>>       getTeams(String tournamentId);
   Future<Either<Failure, void>>                   savePlayers(List<TeamEntity> teams);
+  Future<Either<Failure, void>>                   deleteTournament(String id);
 }
 
 // ── Match Repository ───────────────────────────────────────
@@ -42,6 +43,11 @@ abstract class MatchRepository {
     required int total,
     required List<DateTime?> scheduledTimes,
   });
+  Future<Either<Failure, void>> addMatch({
+    required String tournamentId,
+    required int matchNumber,
+  });
+  Future<Either<Failure, void>> deleteMatch(String matchId);
   Future<Either<Failure, List<MatchEntity>>> getMatches(String tournamentId);
   Future<Either<Failure, void>> updateMatchStatus(String matchId, String status);
   Future<Either<Failure, void>> saveMatchResult({

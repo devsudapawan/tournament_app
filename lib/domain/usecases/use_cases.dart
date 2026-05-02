@@ -212,3 +212,34 @@ class LeaderboardStreamUseCase {
   Stream<List<LeaderboardEntry>> call(String id) =>
       repo.leaderboardStream(id);
 }
+
+
+
+// Add inside TOURNAMENT USE CASES section:
+class DeleteTournamentUseCase {
+  final TournamentRepository repo;
+  DeleteTournamentUseCase(this.repo);
+  Future<Either<Failure, void>> call(String id) =>
+      repo.deleteTournament(id);
+}
+
+// Add inside MATCH USE CASES section:
+class AddMatchUseCase {
+  final MatchRepository repo;
+  AddMatchUseCase(this.repo);
+  Future<Either<Failure, void>> call({
+    required String tournamentId,
+    required int matchNumber,
+  }) =>
+      repo.addMatch(
+        tournamentId: tournamentId,
+        matchNumber:  matchNumber,
+      );
+}
+
+class DeleteMatchUseCase {
+  final MatchRepository repo;
+  DeleteMatchUseCase(this.repo);
+  Future<Either<Failure, void>> call(String matchId) =>
+      repo.deleteMatch(matchId);
+}

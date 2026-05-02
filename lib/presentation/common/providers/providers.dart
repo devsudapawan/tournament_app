@@ -80,6 +80,9 @@ final saveTeamsUseCaseProvider = Provider(
 final getTeamsUseCaseProvider = Provider(
   (ref) => GetTeamsUseCase(ref.watch(tournamentRepositoryProvider)),
 );
+final deleteTournamentUseCaseProvider = Provider(
+      (ref) => DeleteTournamentUseCase(ref.watch(tournamentRepositoryProvider)),
+);
 
 // ── Match Use Cases ────────────────────────────────────────
 final createMatchesUseCaseProvider = Provider(
@@ -93,6 +96,12 @@ final saveMatchResultUseCaseProvider = Provider(
 );
 final savePlayerKillsUseCaseProvider = Provider(
   (ref) => SavePlayerKillsUseCase(ref.watch(matchRepositoryProvider)),
+);
+final addMatchUseCaseProvider = Provider(
+      (ref) => AddMatchUseCase(ref.watch(matchRepositoryProvider)),
+);
+final deleteMatchUseCaseProvider = Provider(
+      (ref) => DeleteMatchUseCase(ref.watch(matchRepositoryProvider)),
 );
 
 // ── Leaderboard Use Cases ──────────────────────────────────
