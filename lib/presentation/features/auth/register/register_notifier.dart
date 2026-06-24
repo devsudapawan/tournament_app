@@ -1,5 +1,7 @@
 // lib/presentation/features/auth/register/register_notifier.dart
 
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../common/providers/providers.dart';
 
@@ -41,6 +43,11 @@ class RegisterNotifier extends StateNotifier<RegisterState> {
   Future<void> signUp({
     required String email,
     required String password,
+    String? fullName,
+    int? age,
+    String? gender,
+    String? phone,
+    File? profileImage,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 

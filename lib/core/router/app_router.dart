@@ -6,6 +6,8 @@ import 'package:tournament_app/presentation/features/auth/profile/profile_screen
 import 'package:tournament_app/presentation/features/home/home_screen.dart';
 import '../../presentation/common/providers/auth_state_provider.dart';
 import '../../presentation/features/dashboard/dashboard_screen.dart';
+import '../../presentation/features/leaderboard/widgets/leaderboard_export_card.dart';
+import '../../domain/entities/leaderboard_entity.dart';
 import '../../presentation/features/news/news_screen.dart';
 import '../../presentation/features/shell/main_shell.dart';
 import '../../presentation/features/splash/splash_screen.dart';
@@ -104,6 +106,27 @@ GoRouter appRouter(AppRouterRef ref) {
           tournamentId: state.pathParameters['tournamentId']!,
         ),
       ),
+      GoRoute(
+        path: AppRoutes.leaderboardExport,
+        builder: (_, state) {
+          final args = state.extra as Map<String, dynamic>;
+          return Scaffold(
+            backgroundColor: const Color(0xFF0A0A0A),
+            appBar: AppBar(
+              title: const Text('Export Preview'),
+              backgroundColor: const Color(0xFF0A0A0A),
+            ),
+            body: SingleChildScrollView(
+              child: LeaderboardExportCard(
+                tournamentName: args['tournamentName'] as String,
+                organizerTag: args['organizerTag'] as String,
+                entries: args['entries'] as List<LeaderboardEntry>,
+                totalMatches: args['totalMatches'] as int,
+              ),
+            ),
+          );
+        },
+      ),
 
       GoRoute(
         path: AppRoutes.newsDetailPage,
@@ -160,5 +183,6 @@ class AppRoutes {
   static const verify = '/verify';
   static const home = '/home';
   static const leaderboard = '/leaderboard';
+  static const leaderboardExport = '/leaderboard-export';
   static const newsDetailPage = '/newsDetailPage';
 }

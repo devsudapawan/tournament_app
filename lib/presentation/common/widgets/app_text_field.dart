@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
@@ -12,6 +13,8 @@ class AppTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final Widget? prefixIcon;
   final bool readOnly;
+  final List<TextInputFormatter>? textInputFormatter;
+  final TextInputAction? textInputAction;
   final VoidCallback? onTap;
   final void Function(String)? onChanged;
   final int maxLines;
@@ -29,7 +32,7 @@ class AppTextField extends StatelessWidget {
     this.readOnly = false,
     this.onTap,
     this.onChanged,
-    this.maxLines = 1,
+    this.maxLines = 1,  this.textInputAction, this.textInputFormatter,
   });
 
   @override
@@ -43,6 +46,8 @@ class AppTextField extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextFormField(
+          inputFormatters : textInputFormatter,
+          textInputAction : textInputAction,
           controller:   controller,
           obscureText:  obscureText,
           keyboardType: keyboardType,
@@ -53,6 +58,7 @@ class AppTextField extends StatelessWidget {
           maxLines:     maxLines,
           style: AppTextStyles.body(color: AppColors.white, size: 15),
           decoration: InputDecoration(
+
             hintText:   hint,
             suffixIcon: suffixIcon,
             prefixIcon: prefixIcon,

@@ -267,7 +267,6 @@ class ResultVerifyNotifier extends StateNotifier<ResultVerifyState> {
         // Save individual player kills for MVP tracking
         final team = teams.firstWhere(
           (t) => t.id == result.teamId,
-          orElse: () => teams.first,
         );
 
         for (final player in result.playerKills) {
